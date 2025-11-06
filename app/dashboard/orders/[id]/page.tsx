@@ -174,7 +174,7 @@ export default function OrderDetailPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader>
+            <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               Expéditeur
@@ -183,21 +183,21 @@ export default function OrderDetailPage() {
           <CardContent className="space-y-2">
             <div>
               <p className="text-sm text-muted-foreground">Nom</p>
-              <p className="font-medium">{shipment.senderName}</p>
+                <p className="font-medium">{shipment.senderName || shipment.sender?.name}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Téléphone</p>
-              <p className="font-medium">{shipment.senderPhone}</p>
+                <p className="font-medium">{shipment.senderPhone || shipment.sender?.phone}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Adresse</p>
-              <p className="font-medium">{shipment.senderAddress}</p>
+                <p className="font-medium">{shipment.senderAddress || shipment.sender?.address}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
+            <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               Destinataire
@@ -206,15 +206,15 @@ export default function OrderDetailPage() {
           <CardContent className="space-y-2">
             <div>
               <p className="text-sm text-muted-foreground">Nom</p>
-              <p className="font-medium">{shipment.recipientName}</p>
+                <p className="font-medium">{shipment.recipientName || shipment.recipient?.name}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Téléphone</p>
-              <p className="font-medium">{shipment.recipientPhone}</p>
+                <p className="font-medium">{shipment.recipientPhone || shipment.recipient?.phone}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Adresse</p>
-              <p className="font-medium">{shipment.recipientAddress}</p>
+                <p className="font-medium">{shipment.recipientAddress || shipment.recipient?.address}</p>
             </div>
           </CardContent>
         </Card>
@@ -247,6 +247,35 @@ export default function OrderDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Prix</p>
                 <p className="font-medium">{shipment.price} €</p>
+              </div>
+            )}
+            {shipment.payment?.method && (
+              <div>
+                <p className="text-sm text-muted-foreground">Paiement</p>
+                <p className="font-medium">{shipment.payment.method}</p>
+              </div>
+            )}
+            {shipment.packageDescription && (
+              <div>
+                <p className="text-sm text-muted-foreground">Description</p>
+                <p className="font-medium">{shipment.packageDescription}</p>
+              </div>
+            )}
+            {(shipment.routeInfo?.from || shipment.routeInfo?.to || shipment.routeInfo?.deliveryMode) && (
+              <div>
+                <p className="text-sm text-muted-foreground">Itinéraire</p>
+                <p className="font-medium">
+                  {shipment.routeInfo?.from || "—"} → {shipment.routeInfo?.to || "—"}
+                  {shipment.routeInfo?.deliveryMode ? ` • ${shipment.routeInfo.deliveryMode}` : ""}
+                  {shipment.routeInfo?.zone ? ` • ${shipment.routeInfo.zone}` : ""}
+                </p>
+              </div>
+            )}
+            {(shipment.packageImageUrl || shipment.packageImage) && (
+              <div>
+                <p className="text-sm text-muted-foreground">Photo du colis</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={shipment.packageImageUrl || shipment.packageImage!} alt="Colis" className="mt-1 max-w-xs rounded border" />
               </div>
             )}
             {shipment.weight && (

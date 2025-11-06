@@ -146,13 +146,13 @@ export default function TrackingPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Expéditeur</p>
-                  <p className="font-medium">{shipment.senderName}</p>
-                  <p className="text-sm text-muted-foreground">{shipment.senderAddress}</p>
+                  <p className="font-medium">{shipment.senderName || shipment.sender?.name}</p>
+                  <p className="text-sm text-muted-foreground">{shipment.senderAddress || shipment.sender?.address}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Destinataire</p>
-                  <p className="font-medium">{shipment.recipientName}</p>
-                  <p className="text-sm text-muted-foreground">{shipment.recipientAddress}</p>
+                  <p className="font-medium">{shipment.recipientName || shipment.recipient?.name}</p>
+                  <p className="text-sm text-muted-foreground">{shipment.recipientAddress || shipment.recipient?.address}</p>
                 </div>
               </div>
               {shipment.currentLocation && (
@@ -195,7 +195,7 @@ export default function TrackingPage() {
                       {step.completed ? "✓" : index + 1}
                     </div>
                     <div className="flex-1">
-                      <p className={cn("font-medium", step.active && "text-primary")}>{step.label}</p>
+                      <p className={cn("font-medium", step.active ? "text-primary" : "")}>{step.label}</p>
                       {step.active && shipment.updatedAt && (
                         <p className="text-sm text-muted-foreground">
                           {shipment.updatedAt.toLocaleDateString("fr-FR", {

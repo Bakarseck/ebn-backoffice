@@ -76,12 +76,22 @@ export default function OrdersPage() {
   }, [])
 
   useEffect(() => {
-    const filtered = shipments.filter(
-      (shipment) =>
-        (shipment.trackingNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-        shipment.senderName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        shipment.recipientName.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
+    const term = searchTerm.toLowerCase()
+    const filtered = shipments.filter((shipment) => {
+      const tracking = shipment.trackingNumber?.toLowerCase() ?? ""
+      const senderFlat = shipment.senderName?.toLowerCase() ?? ""
+      const senderNested = shipment.sender?.name?.toLowerCase() ?? ""
+      const recipientFlat = shipment.recipientName?.toLowerCase() ?? ""
+      const recipientNested = shipment.recipient?.name?.toLowerCase() ?? ""
+
+      return (
+        tracking.includes(term) ||
+        senderFlat.includes(term) ||
+        senderNested.includes(term) ||
+        recipientFlat.includes(term) ||
+        recipientNested.includes(term)
+      )
+    })
     setFilteredShipments(filtered)
   }, [searchTerm, shipments])
 
@@ -167,14 +177,14 @@ export default function OrdersPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div>
-                            <p className="font-medium">{shipment.senderName}</p>
-                            <p className="text-sm text-muted-foreground">{shipment.senderPhone}</p>
+                            <p className="font-medium">{shipment.senderName || shipment.sender?.name}</p>
+                            <p className="text-sm text-muted-foreground">{shipment.senderPhone || shipment.sender?.phone}</p>
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <div>
-                            <p className="font-medium">{shipment.recipientName}</p>
-                            <p className="text-sm text-muted-foreground">{shipment.recipientPhone}</p>
+                            <p className="font-medium">{shipment.recipientName || shipment.recipient?.name}</p>
+                            <p className="text-sm text-muted-foreground">{shipment.recipientPhone || shipment.recipient?.phone}</p>
                           </div>
                         </td>
                         <td className="py-3 px-4">

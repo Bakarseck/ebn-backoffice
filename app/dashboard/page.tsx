@@ -34,7 +34,7 @@ export default function DashboardPage() {
       const shipmentRef = doc(db, "shipments", shipmentId)
 
       const trackingNumber = generateTrackingNumber()
-      const lon = -1.5536 + (Math.random() - 0.5) * 0.1 // Random around Dakar
+      const lon = -1.5536 + (Math.random() - 0.5) * 0.1
       const lat = 14.6928 + (Math.random() - 0.5) * 0.1
 
       await updateDoc(shipmentRef, {
@@ -177,10 +177,10 @@ export default function DashboardPage() {
                   >
                     <div className="flex-1">
                       <p className="font-medium">
-                        {shipment.senderName} → {shipment.recipientName}
+                        {(shipment.senderName || shipment.sender?.name) || "—"} → {(shipment.recipientName || shipment.recipient?.name) || "—"}
                       </p>
-                      <p className="text-sm text-muted-foreground mt-1">De: {shipment.senderAddress}</p>
-                      <p className="text-sm text-muted-foreground">Vers: {shipment.recipientAddress}</p>
+                      <p className="text-sm text-muted-foreground mt-1">De: {shipment.senderAddress || shipment.sender?.address || "—"}</p>
+                      <p className="text-sm text-muted-foreground">Vers: {shipment.recipientAddress || shipment.recipient?.address || "—"}</p>
                       {shipment.price && <p className="text-sm font-medium mt-2">{shipment.price} €</p>}
                     </div>
                     <div className="flex gap-2">
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                       <div>
                         <p className="font-medium">{shipment.trackingNumber}</p>
                         <p className="text-sm text-muted-foreground">
-                          {shipment.senderName} → {shipment.recipientName}
+                          {(shipment.senderName || shipment.sender?.name) || "—"} → {(shipment.recipientName || shipment.recipient?.name) || "—"}
                         </p>
                       </div>
                       <div className="text-right">
