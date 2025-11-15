@@ -14,6 +14,11 @@ export interface Shipment {
     name: string
     phone: string
     address?: string
+    email?: string
+    location?: {
+      latitude: number
+      longitude: number
+    }
   }
   recipient?: {
     name: string
@@ -33,6 +38,8 @@ export interface Shipment {
   packageImageUrl?: string
   packageDescription?: string
   userId?: string
+  chauffeurId?: string // ID du chauffeur assigné à cette expédition
+  chauffeurName?: string // Nom du chauffeur (pour affichage)
   status: "pending" | "picked-up" | "in-transit" | "out-for-delivery" | "delivered" | "cancelled"
   createdAt: Date
   updatedAt: Date
@@ -42,4 +49,15 @@ export interface Shipment {
   currentLocation?: string
   lon?: number
   lat?: number
+}
+
+export interface AppUser {
+  uid: string
+  email: string
+  name: string
+  phone: string
+  role: "user" | "admin" | "chauffeur"
+  fcmToken?: string
+  createdAt: Date
+  updatedAt: Date
 }

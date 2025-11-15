@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Package, User, Clock, Check, MapPin } from "lucide-react"
-import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { ArrowLeft, Package, User, Clock, Check, MapPin, UserCheck } from "lucide-react"
+import { doc, getDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import type { Shipment } from "@/lib/types"
+import type { Shipment, AppUser } from "@/lib/types"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -17,6 +18,8 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [accepting, setAccepting] = useState(false)
+  const [chauffeurs, setChauffeurs] = useState<AppUser[]>([])
+  const [assigningChauffeur, setAssigningChauffeur] = useState(false)
 
   const generateTrackingNumber = () => {
     const prefix = "EBN"
@@ -66,12 +69,17 @@ export default function OrderDetailPage() {
         const shipmentDoc = await getDoc(shipmentRef)
 
         if (shipmentDoc.exists()) {
-          setShipment({
+          const docData = shipmentDoc.data()
+          const shipmentData: Shipment = {
             id: shipmentDoc.id,
-            ...shipmentDoc.data(),
-            createdAt: shipmentDoc.data().createdAt?.toDate(),
-            updatedAt: shipmentDoc.data().updatedAt?.toDate(),
-          } as Shipment)
+            ...docData,
+            // Ensure lat and lon are properly extracted as numbers
+            lat: typeof docData.lat === "number" ? docData.lat : typeof docData.lat === "string" ? parseFloat(docData.lat) : docData.lat,
+            lon: typeof docData.lon === "number" ? docData.lon : typeof docData.lon === "string" ? parseFloat(docData.lon) : docData.lon,
+            createdAt: docData.createdAt?.toDate(),
+            updatedAt: docData.updatedAt?.toDate(),
+          } as Shipment
+          setShipment(shipmentData)
         }
       } catch (error) {
         console.error("Error fetching shipment:", error)
@@ -82,6 +90,84 @@ export default function OrderDetailPage() {
 
     fetchShipment()
   }, [params.id])
+
+  // Charger la liste des chauffeurs
+  useEffect(() => {
+    async function fetchChauffeurs() {
+      try {
+        const usersRef = collection(db, "users")
+        const q = query(usersRef, where("role", "==", "chauffeur"))
+        const snapshot = await getDocs(q)
+
+        const data = snapshot.docs
+          .map((doc) => {
+            const docData = doc.data()
+            return {
+              uid: doc.id,
+              email: docData.email || "",
+              name: docData.name || "",
+              phone: docData.phone || "",
+              role: docData.role || "chauffeur",
+              fcmToken: docData.fcmToken,
+              createdAt: docData.createdAt?.toDate() || new Date(),
+              updatedAt: docData.updatedAt?.toDate() || new Date(),
+            } as AppUser
+          })
+          .filter((user) => user.email)
+
+        setChauffeurs(data)
+      } catch (error) {
+        console.error("Error fetching chauffeurs:", error)
+      }
+    }
+
+    fetchChauffeurs()
+  }, [])
+
+  const handleAssignChauffeur = async (chauffeurId: string) => {
+    if (!shipment) return
+
+    setAssigningChauffeur(true)
+    try {
+      const shipmentRef = doc(db, "shipments", shipment.id)
+
+      if (chauffeurId === "none" || chauffeurId === "") {
+        // Retirer l'assignation
+        await updateDoc(shipmentRef, {
+          chauffeurId: null,
+          chauffeurName: null,
+          updatedAt: new Date(),
+        })
+
+        setShipment({
+          ...shipment,
+          chauffeurId: undefined,
+          chauffeurName: undefined,
+          updatedAt: new Date(),
+        })
+      } else {
+        // Assigner un chauffeur
+        const selectedChauffeur = chauffeurs.find((c) => c.uid === chauffeurId)
+
+        await updateDoc(shipmentRef, {
+          chauffeurId,
+          chauffeurName: selectedChauffeur?.name || "",
+          updatedAt: new Date(),
+        })
+
+        setShipment({
+          ...shipment,
+          chauffeurId,
+          chauffeurName: selectedChauffeur?.name || "",
+          updatedAt: new Date(),
+        })
+      }
+    } catch (error) {
+      console.error("Error assigning chauffeur:", error)
+    } finally {
+      setAssigningChauffeur(false)
+    }
+  }
 
   const handleStatusUpdate = async (newStatus: string) => {
     if (!shipment) return
@@ -290,15 +376,54 @@ export default function OrderDetailPage() {
                 <p className="font-medium">{shipment.currentLocation}</p>
               </div>
             )}
-            {shipment.lon && shipment.lat && (
+            {shipment.lon != null && shipment.lat != null && (
               <div>
                 <p className="text-sm text-muted-foreground">Coordonnées GPS</p>
                 <p className="font-medium flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  {shipment.lat.toFixed(4)}, {shipment.lon.toFixed(4)}
+                  {typeof shipment.lat === "number" && typeof shipment.lon === "number"
+                    ? `${shipment.lat.toFixed(4)}, ${shipment.lon.toFixed(4)}`
+                    : `${shipment.lat}, ${shipment.lon}`}
                 </p>
               </div>
             )}
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Chauffeur assigné</p>
+              <Select
+                value={shipment.chauffeurId || "none"}
+                onValueChange={handleAssignChauffeur}
+                disabled={assigningChauffeur || needsAcceptance}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un chauffeur" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun chauffeur</SelectItem>
+                  {chauffeurs.length === 0 ? (
+                    <SelectItem value="no-drivers" disabled>
+                      Aucun chauffeur disponible
+                    </SelectItem>
+                  ) : (
+                    chauffeurs.map((chauffeur) => (
+                      <SelectItem key={chauffeur.uid} value={chauffeur.uid}>
+                        {chauffeur.name} ({chauffeur.phone})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {shipment.chauffeurName && shipment.chauffeurId && (
+                <div className="mt-2">
+                  <Link
+                    href={`/dashboard/chauffeurs/${shipment.chauffeurId}`}
+                    className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {shipment.chauffeurName}
+                  </Link>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -349,7 +474,7 @@ export default function OrderDetailPage() {
         </Card>
       )}
 
-      {shipment.lon && shipment.lat && (
+      {shipment.lon != null && shipment.lat != null && typeof shipment.lat === "number" && typeof shipment.lon === "number" && (
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -364,6 +489,7 @@ export default function OrderDetailPage() {
                 height="100%"
                 frameBorder="0"
                 src={`https://www.openstreetmap.org/export/embed.html?bbox=${shipment.lon - 0.01},${shipment.lat - 0.01},${shipment.lon + 0.01},${shipment.lat + 0.01}&layer=mapnik&marker=${shipment.lat},${shipment.lon}`}
+                title="Position de l'expédition"
               />
             </div>
           </CardContent>

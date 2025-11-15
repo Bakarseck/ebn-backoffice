@@ -155,6 +155,7 @@ export default function OrdersPage() {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">N° Suivi</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Expéditeur</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Destinataire</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Chauffeur</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Statut</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Prix</th>
@@ -186,6 +187,18 @@ export default function OrdersPage() {
                             <p className="font-medium">{shipment.recipientName || shipment.recipient?.name}</p>
                             <p className="text-sm text-muted-foreground">{shipment.recipientPhone || shipment.recipient?.phone}</p>
                           </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {shipment.chauffeurName ? (
+                            <Link
+                              href={`/dashboard/chauffeurs/${shipment.chauffeurId}`}
+                              className="text-sm font-medium text-primary hover:underline"
+                            >
+                              {shipment.chauffeurName}
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Non assigné</span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <span

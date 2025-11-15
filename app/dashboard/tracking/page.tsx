@@ -26,13 +26,37 @@ export default function TrackingPage() {
       const snapshot = await getDocs(q)
 
       if (!snapshot.empty) {
-        const doc = snapshot.docs[0]
-        setShipment({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate(),
-          updatedAt: doc.data().updatedAt?.toDate(),
-        } as Shipment)
+        const docData = snapshot.docs[0].data()
+        
+        // Extraire les coordonnées GPS
+        // Priorité 1: lat/lon directs (pour les colis acceptés)
+        // Priorité 2: sender.location (pour les colis porte à porte)
+        let lat = typeof docData.lat === "number" ? docData.lat : typeof docData.lat === "string" ? parseFloat(docData.lat) : undefined
+        let lon = typeof docData.lon === "number" ? docData.lon : typeof docData.lon === "string" ? parseFloat(docData.lon) : undefined
+        
+        // Si pas de lat/lon directs, essayer depuis sender.location (pour porte à porte)
+        if ((lat == null || lon == null) && docData.sender?.location) {
+          lat = typeof docData.sender.location.latitude === "number" 
+            ? docData.sender.location.latitude 
+            : typeof docData.sender.location.latitude === "string" 
+            ? parseFloat(docData.sender.location.latitude) 
+            : undefined
+          lon = typeof docData.sender.location.longitude === "number" 
+            ? docData.sender.location.longitude 
+            : typeof docData.sender.location.longitude === "string" 
+            ? parseFloat(docData.sender.location.longitude) 
+            : undefined
+        }
+        
+        const shipmentData: Shipment = {
+          id: snapshot.docs[0].id,
+          ...docData,
+          lat,
+          lon,
+          createdAt: docData.createdAt?.toDate(),
+          updatedAt: docData.updatedAt?.toDate(),
+        } as Shipment
+        setShipment(shipmentData)
       } else {
         setShipment(null)
       }
@@ -45,6 +69,7 @@ export default function TrackingPage() {
   }
 
   const getStatusLabel = (status: string) => {
+    const statusLower = status.toLowerCase()
     const labels: Record<string, { text: string; color: string }> = {
       pending: { text: "En attente", color: "bg-gray-500/10 text-gray-500" },
       "picked-up": { text: "Récupéré", color: "bg-blue-500/10 text-blue-500" },
@@ -52,8 +77,10 @@ export default function TrackingPage() {
       "out-for-delivery": { text: "En livraison", color: "bg-orange-500/10 text-orange-500" },
       delivered: { text: "Livré", color: "bg-green-500/10 text-green-500" },
       cancelled: { text: "Annulé", color: "bg-red-500/10 text-red-500" },
+      "en cours": { text: "En cours", color: "bg-purple-500/10 text-purple-500" },
     }
-    return labels[status] || labels.pending
+    // Chercher le statut en minuscules ou retourner le label par défaut
+    return labels[statusLower] || labels[status] || { text: status, color: "bg-gray-500/10 text-gray-500" }
   }
 
   const getStatusSteps = (currentStatus: string) => {
@@ -164,12 +191,17 @@ export default function TrackingPage() {
                   </p>
                 </div>
               )}
-              {shipment.lon && shipment.lat && (
+              {(shipment.lon != null && shipment.lat != null) && (
                 <div>
                   <p className="text-sm text-muted-foreground">Coordonnées GPS</p>
                   <p className="font-medium flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    {shipment.lat.toFixed(4)}, {shipment.lon.toFixed(4)}
+                    {typeof shipment.lat === "number" && typeof shipment.lon === "number"
+                      ? `${shipment.lat.toFixed(4)}, ${shipment.lon.toFixed(4)}`
+                      : `${shipment.lat}, ${shipment.lon}`}
+                    {shipment.routeInfo?.deliveryMode === "porte_a_porte" && (
+                      <span className="text-xs text-muted-foreground">(Porte à porte)</span>
+                    )}
                   </p>
                 </div>
               )}
@@ -213,12 +245,18 @@ export default function TrackingPage() {
             </CardContent>
           </Card>
 
-          {shipment.lon && shipment.lat && (
+          {shipment.lon != null && 
+           shipment.lat != null && 
+           typeof shipment.lat === "number" && 
+           typeof shipment.lon === "number" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
                   Position sur la carte
+                  {shipment.routeInfo?.deliveryMode === "porte_a_porte" && (
+                    <span className="text-sm text-muted-foreground font-normal">(Livraison porte à porte)</span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -227,7 +265,10 @@ export default function TrackingPage() {
                     width="100%"
                     height="100%"
                     frameBorder="0"
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${shipment.lon - 0.01},${shipment.lat - 0.01},${shipment.lon + 0.01},${shipment.lat + 0.01}&layer=mapnik&marker=${shipment.lat},${shipment.lon}`}
+                    style={{ border: 0 }}
+                    src={`https://www.google.com/maps?q=${shipment.lat},${shipment.lon}&z=15&output=embed`}
+                    title="Position de l'expédition"
+                    allowFullScreen
                   />
                 </div>
               </CardContent>
