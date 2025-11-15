@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   title: "EBN Express - Backoffice",
   description: "Backoffice de gestion EBN Express",
   generator: "v0.app",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 }
 
 export default function RootLayout({
