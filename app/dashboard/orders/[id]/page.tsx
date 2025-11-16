@@ -6,8 +6,8 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Package, User, Clock, Check, MapPin, UserCheck } from "lucide-react"
-import { doc, getDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore"
+import { ArrowLeft, Package, User, Clock, Check, MapPin, UserCheck, Trash2 } from "lucide-react"
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment, AppUser } from "@/lib/types"
 
@@ -20,6 +20,7 @@ export default function OrderDetailPage() {
   const [accepting, setAccepting] = useState(false)
   const [chauffeurs, setChauffeurs] = useState<AppUser[]>([])
   const [assigningChauffeur, setAssigningChauffeur] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const generateTrackingNumber = () => {
     const prefix = "EBN"
@@ -73,6 +74,8 @@ export default function OrderDetailPage() {
           const shipmentData: Shipment = {
             id: shipmentDoc.id,
             ...docData,
+            // Mapper packagePrice vers price si packagePrice existe
+            price: docData.price || docData.packagePrice,
             // Ensure lat and lon are properly extracted as numbers
             lat: typeof docData.lat === "number" ? docData.lat : typeof docData.lat === "string" ? parseFloat(docData.lat) : docData.lat,
             lon: typeof docData.lon === "number" ? docData.lon : typeof docData.lon === "string" ? parseFloat(docData.lon) : docData.lon,
@@ -188,6 +191,26 @@ export default function OrderDetailPage() {
     }
   }
 
+  const handleDeleteShipment = async () => {
+    if (!shipment) return
+
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette expédition ? Cette action est irréversible.")) {
+      return
+    }
+
+    try {
+      setDeleting(true)
+      const shipmentRef = doc(db, "shipments", shipment.id)
+      await deleteDoc(shipmentRef)
+      router.push("/dashboard/orders")
+    } catch (error) {
+      console.error("Error deleting shipment:", error)
+      alert("Erreur lors de la suppression de l'expédition")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       pending: "En attente",
@@ -241,21 +264,41 @@ export default function OrderDetailPage() {
             {needsAcceptance ? "En attente d'acceptation" : shipment.trackingNumber}
           </p>
         </div>
-        {needsAcceptance && (
-          <Button onClick={handleAcceptShipment} disabled={accepting} size="lg">
-            {accepting ? (
+        <div className="flex gap-2">
+          {needsAcceptance && (
+            <Button onClick={handleAcceptShipment} disabled={accepting} size="lg">
+              {accepting ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                  Acceptation...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Accepter l'expédition
+                </>
+              )}
+            </Button>
+          )}
+          <Button
+            onClick={handleDeleteShipment}
+            disabled={deleting}
+            variant="destructive"
+            size="lg"
+          >
+            {deleting ? (
               <>
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                Acceptation...
+                Suppression...
               </>
             ) : (
               <>
-                <Check className="h-4 w-4 mr-2" />
-                Accepter l'expédition
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
               </>
             )}
           </Button>
-        )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -332,7 +375,7 @@ export default function OrderDetailPage() {
             {shipment.price && (
               <div>
                 <p className="text-sm text-muted-foreground">Prix</p>
-                <p className="font-medium">{shipment.price} €</p>
+                <p className="font-medium">{shipment.price.toLocaleString('fr-FR')} FCFA</p>
               </div>
             )}
             {shipment.payment?.method && (

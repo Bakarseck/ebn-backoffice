@@ -4,8 +4,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Package, Eye, Check } from "lucide-react"
-import { collection, query, getDocs, orderBy, doc, updateDoc } from "firebase/firestore"
+import { Search, Package, Eye, Check, Trash2 } from "lucide-react"
+import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment } from "@/lib/types"
 import Link from "next/link"
@@ -16,6 +16,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const generateTrackingNumber = () => {
     const prefix = "EBN"
@@ -49,18 +50,41 @@ export default function OrdersPage() {
     }
   }
 
+  const handleDeleteShipment = async (shipmentId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette expédition ? Cette action est irréversible.")) {
+      return
+    }
+
+    try {
+      setDeletingId(shipmentId)
+      const shipmentRef = doc(db, "shipments", shipmentId)
+      await deleteDoc(shipmentRef)
+      fetchShipments()
+    } catch (error) {
+      console.error("Error deleting shipment:", error)
+      alert("Erreur lors de la suppression de l'expédition")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const fetchShipments = async () => {
     try {
       const shipmentsRef = collection(db, "shipments")
       const shipmentsQuery = query(shipmentsRef, orderBy("createdAt", "desc"))
       const snapshot = await getDocs(shipmentsQuery)
 
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as Shipment[]
+      const data = snapshot.docs.map((doc) => {
+        const docData = doc.data()
+        return {
+          id: doc.id,
+          ...docData,
+          // Mapper packagePrice vers price si packagePrice existe
+          price: docData.price || docData.packagePrice,
+          createdAt: docData.createdAt?.toDate(),
+          updatedAt: docData.updatedAt?.toDate(),
+        } as Shipment
+      })
 
       setShipments(data)
       setFilteredShipments(data)
@@ -213,7 +237,9 @@ export default function OrdersPage() {
                         <td className="py-3 px-4 text-sm text-muted-foreground">
                           {shipment.createdAt?.toLocaleDateString("fr-FR")}
                         </td>
-                        <td className="py-3 px-4 font-medium">{shipment.price ? `${shipment.price} €` : "-"}</td>
+                        <td className="py-3 px-4 font-medium">
+                          {shipment.price ? `${shipment.price.toLocaleString('fr-FR')} FCFA` : "-"}
+                        </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {needsAcceptance && (
@@ -234,6 +260,19 @@ export default function OrdersPage() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </Link>
+                            <Button
+                              onClick={() => handleDeleteShipment(shipment.id)}
+                              disabled={deletingId === shipment.id}
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              {deletingId === shipment.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
                         </td>
                       </tr>

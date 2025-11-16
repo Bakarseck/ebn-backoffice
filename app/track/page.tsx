@@ -52,6 +52,8 @@ function TrackForm() {
         const shipmentData: Shipment = {
           id: snapshot.docs[0].id,
           ...docData,
+          // Mapper packagePrice vers price si packagePrice existe
+          price: docData.price || docData.packagePrice,
           lat,
           lon,
           createdAt: docData.createdAt?.toDate(),
