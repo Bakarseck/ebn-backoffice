@@ -4,11 +4,22 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Package, Eye, Check, Trash2 } from "lucide-react"
+import { Search, Package, Eye, Check, Trash2, AlertTriangle } from "lucide-react"
 import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment } from "@/lib/types"
 import Link from "next/link"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 
 export default function OrdersPage() {
   const [shipments, setShipments] = useState<Shipment[]>([])
@@ -17,6 +28,9 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [shipmentToDelete, setShipmentToDelete] = useState<{ id: string; trackingNumber?: string } | null>(null)
+  const { toast } = useToast()
 
   const generateTrackingNumber = () => {
     const prefix = "EBN"
@@ -50,19 +64,37 @@ export default function OrdersPage() {
     }
   }
 
-  const handleDeleteShipment = async (shipmentId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette expédition ? Cette action est irréversible.")) {
-      return
-    }
+  const handleDeleteClick = (shipment: Shipment) => {
+    setShipmentToDelete({ id: shipment.id, trackingNumber: shipment.trackingNumber })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteShipment = async () => {
+    if (!shipmentToDelete) return
 
     try {
-      setDeletingId(shipmentId)
-      const shipmentRef = doc(db, "shipments", shipmentId)
+      setDeletingId(shipmentToDelete.id)
+      const shipmentRef = doc(db, "shipments", shipmentToDelete.id)
       await deleteDoc(shipmentRef)
+      
+      toast({
+        title: "Expédition supprimée",
+        description: shipmentToDelete.trackingNumber 
+          ? `L'expédition ${shipmentToDelete.trackingNumber} a été supprimée avec succès.`
+          : "L'expédition a été supprimée avec succès.",
+        variant: "default",
+      })
+      
+      setDeleteDialogOpen(false)
+      setShipmentToDelete(null)
       fetchShipments()
     } catch (error) {
       console.error("Error deleting shipment:", error)
-      alert("Erreur lors de la suppression de l'expédition")
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la suppression de l'expédition.",
+        variant: "destructive",
+      })
     } finally {
       setDeletingId(null)
     }
@@ -261,7 +293,7 @@ export default function OrdersPage() {
                               </Button>
                             </Link>
                             <Button
-                              onClick={() => handleDeleteShipment(shipment.id)}
+                              onClick={() => handleDeleteClick(shipment)}
                               disabled={deletingId === shipment.id}
                               variant="ghost"
                               size="sm"
@@ -284,6 +316,52 @@ export default function OrdersPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <AlertDialogTitle>Supprimer l'expédition</AlertDialogTitle>
+                <AlertDialogDescription className="mt-2">
+                  {shipmentToDelete?.trackingNumber ? (
+                    <>
+                      Êtes-vous sûr de vouloir supprimer l'expédition <strong>{shipmentToDelete.trackingNumber}</strong> ?
+                    </>
+                  ) : (
+                    "Êtes-vous sûr de vouloir supprimer cette expédition ?"
+                  )}
+                  <br />
+                  <span className="text-destructive font-medium">Cette action est irréversible.</span>
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingId !== null}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteShipment}
+              disabled={deletingId !== null}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingId ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Suppression...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Supprimer
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

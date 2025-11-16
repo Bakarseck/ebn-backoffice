@@ -6,10 +6,21 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Package, User, Clock, Check, MapPin, UserCheck, Trash2 } from "lucide-react"
+import { ArrowLeft, Package, User, Clock, Check, MapPin, UserCheck, Trash2, AlertTriangle } from "lucide-react"
 import { doc, getDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment, AppUser } from "@/lib/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -21,6 +32,8 @@ export default function OrderDetailPage() {
   const [chauffeurs, setChauffeurs] = useState<AppUser[]>([])
   const [assigningChauffeur, setAssigningChauffeur] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const { toast } = useToast()
 
   const generateTrackingNumber = () => {
     const prefix = "EBN"
@@ -191,22 +204,34 @@ export default function OrderDetailPage() {
     }
   }
 
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true)
+  }
+
   const handleDeleteShipment = async () => {
     if (!shipment) return
-
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette expédition ? Cette action est irréversible.")) {
-      return
-    }
 
     try {
       setDeleting(true)
       const shipmentRef = doc(db, "shipments", shipment.id)
       await deleteDoc(shipmentRef)
+      
+      toast({
+        title: "Expédition supprimée",
+        description: shipment.trackingNumber 
+          ? `L'expédition ${shipment.trackingNumber} a été supprimée avec succès.`
+          : "L'expédition a été supprimée avec succès.",
+        variant: "default",
+      })
+      
       router.push("/dashboard/orders")
     } catch (error) {
       console.error("Error deleting shipment:", error)
-      alert("Erreur lors de la suppression de l'expédition")
-    } finally {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la suppression de l'expédition.",
+        variant: "destructive",
+      })
       setDeleting(false)
     }
   }
@@ -281,22 +306,13 @@ export default function OrderDetailPage() {
             </Button>
           )}
           <Button
-            onClick={handleDeleteShipment}
+            onClick={handleDeleteClick}
             disabled={deleting}
             variant="destructive"
             size="lg"
           >
-            {deleting ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                Suppression...
-              </>
-            ) : (
-              <>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </>
-            )}
+            <Trash2 className="h-4 w-4 mr-2" />
+            Supprimer
           </Button>
         </div>
       </div>
@@ -531,13 +547,61 @@ export default function OrderDetailPage() {
                 width="100%"
                 height="100%"
                 frameBorder="0"
-                src={`https://www.openstreetmap.org/export/embed.html?bbox=${shipment.lon - 0.01},${shipment.lat - 0.01},${shipment.lon + 0.01},${shipment.lat + 0.01}&layer=mapnik&marker=${shipment.lat},${shipment.lon}`}
+                style={{ border: 0 }}
+                src={`https://www.google.com/maps?q=${shipment.lat},${shipment.lon}&z=15&output=embed`}
                 title="Position de l'expédition"
+                allowFullScreen
               />
             </div>
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <AlertDialogTitle>Supprimer l'expédition</AlertDialogTitle>
+                <AlertDialogDescription className="mt-2">
+                  {shipment?.trackingNumber ? (
+                    <>
+                      Êtes-vous sûr de vouloir supprimer l'expédition <strong>{shipment.trackingNumber}</strong> ?
+                    </>
+                  ) : (
+                    "Êtes-vous sûr de vouloir supprimer cette expédition ?"
+                  )}
+                  <br />
+                  <span className="text-destructive font-medium">Cette action est irréversible.</span>
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteShipment}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Suppression...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Supprimer
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
