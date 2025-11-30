@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Package, Truck, CheckCircle, Clock, Check } from "lucide-react"
+import { Package, Truck, CheckCircle, Clock, Check, UserCheck } from "lucide-react"
 import { collection, query, getDocs, orderBy, doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment } from "@/lib/types"
 import Link from "next/link"
 import { assignCoursierToShipment, assignPendingPorteAPorteShipments } from "@/lib/coursier-assignment"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -21,6 +22,8 @@ export default function DashboardPage() {
   const [recentShipments, setRecentShipments] = useState<Shipment[]>([])
   const [loading, setLoading] = useState(true)
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  const [assigningAll, setAssigningAll] = useState(false)
+  const { toast } = useToast()
 
   const generateTrackingNumber = () => {
     const prefix = "EBN"
@@ -91,6 +94,42 @@ export default function DashboardPage() {
       console.error("Error accepting shipment:", error)
     } finally {
       setAcceptingId(null)
+    }
+  }
+
+  const handleAssignAllPending = async () => {
+    setAssigningAll(true)
+    try {
+      const result = await assignPendingPorteAPorteShipments()
+      if (result.assigned > 0) {
+        toast({
+          title: "✅ Assignation réussie",
+          description: `${result.assigned} colis porte à porte assigné(s) avec succès aux coursiers.${result.failed > 0 ? ` ${result.failed} échec(s).` : ""}`,
+          variant: "default",
+        })
+        fetchData()
+      } else if (result.failed > 0) {
+        toast({
+          title: "⚠️ Aucun colis assigné",
+          description: `${result.failed} colis n'ont pas pu être assignés. Vérifiez qu'il y a des coursiers disponibles.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "ℹ️ Aucun colis en attente",
+          description: "Tous les colis porte à porte ont déjà un coursier assigné.",
+          variant: "default",
+        })
+      }
+    } catch (error) {
+      console.error("Error assigning all pending shipments:", error)
+      toast({
+        title: "❌ Erreur",
+        description: "Une erreur est survenue lors de l'assignation automatique.",
+        variant: "destructive",
+      })
+    } finally {
+      setAssigningAll(false)
     }
   }
 
@@ -181,9 +220,29 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
-        <p className="text-muted-foreground">Vue d'ensemble de votre activité</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
+          <p className="text-muted-foreground">Vue d'ensemble de votre activité</p>
+        </div>
+        <Button
+          onClick={handleAssignAllPending}
+          disabled={assigningAll}
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+          size="lg"
+        >
+          {assigningAll ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Assignation en cours...
+            </>
+          ) : (
+            <>
+              <UserCheck className="h-5 w-5" />
+              Assigner automatiquement les coursiers
+            </>
+          )}
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
