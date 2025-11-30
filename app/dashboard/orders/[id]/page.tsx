@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { assignCoursierToShipment } from "@/lib/coursier-assignment"
 
 export default function OrderDetailPage() {
   const params = useParams()
@@ -50,8 +51,19 @@ export default function OrderDetailPage() {
       const shipmentRef = doc(db, "shipments", shipment.id)
 
       const trackingNumber = generateTrackingNumber()
-      const lon = -1.5536 + (Math.random() - 0.5) * 0.1
-      const lat = 14.6928 + (Math.random() - 0.5) * 0.1
+      
+      // Extraire les coordonnées GPS depuis sender.location si disponible (porte à porte)
+      // Sinon utiliser des coordonnées aléatoires
+      let lon: number
+      let lat: number
+      
+      if (shipment.sender?.location?.longitude && shipment.sender?.location?.latitude) {
+        lon = shipment.sender.location.longitude
+        lat = shipment.sender.location.latitude
+      } else {
+        lon = -1.5536 + (Math.random() - 0.5) * 0.1
+        lat = 14.6928 + (Math.random() - 0.5) * 0.1
+      }
 
       await updateDoc(shipmentRef, {
         trackingNumber,
@@ -61,16 +73,40 @@ export default function OrderDetailPage() {
         updatedAt: new Date(),
       })
 
-      setShipment({
+      const updatedShipment = {
         ...shipment,
         trackingNumber,
         lon,
         lat,
-        status: "picked-up",
+        status: "picked-up" as const,
         updatedAt: new Date(),
-      })
+      }
+
+      setShipment(updatedShipment)
+
+      // Assignation automatique pour les colis porte à porte
+      if (shipment.routeInfo?.deliveryMode === "porte_a_porte") {
+        const assignmentResult = await assignCoursierToShipment(shipment.id, updatedShipment)
+        if (assignmentResult.success) {
+          setShipment({
+            ...updatedShipment,
+            coursierId: assignmentResult.coursierId,
+            coursierName: assignmentResult.coursierName,
+          })
+          toast({
+            title: "Coursier assigné",
+            description: `Le coursier ${assignmentResult.coursierName} a été automatiquement assigné à ce colis.`,
+            variant: "default",
+          })
+        }
+      }
     } catch (error) {
       console.error("Error accepting shipment:", error)
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de l'acceptation de l'expédition.",
+        variant: "destructive",
+      })
     } finally {
       setAccepting(false)
     }
@@ -483,6 +519,25 @@ export default function OrderDetailPage() {
                 </div>
               )}
             </div>
+            {shipment.routeInfo?.deliveryMode === "porte_a_porte" && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Coursier assigné</p>
+                {shipment.coursierName && shipment.coursierId ? (
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 text-purple-500" />
+                    <Link
+                      href={`/dashboard/coursiers/${shipment.coursierId}`}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      {shipment.coursierName}
+                    </Link>
+                    <span className="text-xs text-muted-foreground">(Assigné automatiquement)</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucun coursier assigné</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

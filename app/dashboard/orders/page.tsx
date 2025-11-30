@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Package, Eye, Check, Trash2, AlertTriangle } from "lucide-react"
-import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore"
+import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment } from "@/lib/types"
+import { assignCoursierToShipment } from "@/lib/coursier-assignment"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -43,10 +44,28 @@ export default function OrdersPage() {
     try {
       setAcceptingId(shipmentId)
       const shipmentRef = doc(db, "shipments", shipmentId)
+      const shipmentDoc = await getDoc(shipmentRef)
+      
+      if (!shipmentDoc.exists()) {
+        console.error("Shipment not found")
+        return
+      }
 
+      const shipmentData = shipmentDoc.data() as Shipment
       const trackingNumber = generateTrackingNumber()
-      const lon = -1.5536 + (Math.random() - 0.5) * 0.1
-      const lat = 14.6928 + (Math.random() - 0.5) * 0.1
+      
+      // Extraire les coordonnées GPS depuis sender.location si disponible (porte à porte)
+      // Sinon utiliser des coordonnées aléatoires
+      let lon: number
+      let lat: number
+      
+      if (shipmentData.sender?.location?.longitude && shipmentData.sender?.location?.latitude) {
+        lon = shipmentData.sender.location.longitude
+        lat = shipmentData.sender.location.latitude
+      } else {
+        lon = -1.5536 + (Math.random() - 0.5) * 0.1
+        lat = 14.6928 + (Math.random() - 0.5) * 0.1
+      }
 
       await updateDoc(shipmentRef, {
         trackingNumber,
@@ -55,6 +74,20 @@ export default function OrdersPage() {
         status: "picked-up",
         updatedAt: new Date(),
       })
+
+      // Assignation automatique pour les colis porte à porte
+      if (shipmentData.routeInfo?.deliveryMode === "porte_a_porte") {
+        const updatedShipment: Shipment = {
+          ...shipmentData,
+          id: shipmentId,
+          trackingNumber,
+          lon,
+          lat,
+          status: "picked-up",
+          updatedAt: new Date(),
+        }
+        await assignCoursierToShipment(shipmentId, updatedShipment)
+      }
 
       fetchShipments()
     } catch (error) {

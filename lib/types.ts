@@ -40,6 +40,8 @@ export interface Shipment {
   userId?: string
   chauffeurId?: string // ID du chauffeur assigné à cette expédition
   chauffeurName?: string // Nom du chauffeur (pour affichage)
+  coursierId?: string // ID du coursier assigné à cette expédition (pour porte à porte)
+  coursierName?: string // Nom du coursier (pour affichage)
   status: "pending" | "picked-up" | "in-transit" | "out-for-delivery" | "delivered" | "cancelled"
   createdAt: Date
   updatedAt: Date
@@ -56,8 +58,13 @@ export interface AppUser {
   email: string
   name: string
   phone: string
-  role: "user" | "admin" | "chauffeur"
+  role: "user" | "admin" | "chauffeur" | "coursier"
   fcmToken?: string
+  location?: {
+    latitude: number
+    longitude: number
+    updatedAt?: Date
+  }
   createdAt: Date
   updatedAt: Date
 }

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { useSidebar } from "./sidebar-context"
 import { Button } from "@/components/ui/button"
-import { LayoutDashboard, Package, MapPin, Settings, LogOut, Users, ChevronLeft, ChevronRight, UserCheck } from "lucide-react"
+import { LayoutDashboard, Package, MapPin, Settings, LogOut, Users, ChevronLeft, ChevronRight, UserCheck, Truck } from "lucide-react"
 import Image from "next/image"
 
 const navigation = [
@@ -14,6 +14,7 @@ const navigation = [
   { name: "Expéditions", href: "/dashboard/orders", icon: Package },
   { name: "Suivi", href: "/dashboard/tracking", icon: MapPin },
   { name: "Chauffeurs", href: "/dashboard/chauffeurs", icon: UserCheck },
+  { name: "Coursiers", href: "/dashboard/coursiers", icon: Truck },
   { name: "Utilisateurs", href: "/dashboard/users", icon: Users },
   { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
 ]

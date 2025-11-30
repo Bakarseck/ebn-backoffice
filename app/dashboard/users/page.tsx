@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { UserPlus, Search, User, Shield, UserCheck } from "lucide-react"
+import { UserPlus, Search, User, Shield, UserCheck, Truck } from "lucide-react"
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore"
 import { createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword } from "firebase/auth"
 import { db, auth } from "@/lib/firebase"
@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context"
 import type { AppUser } from "@/lib/types"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
+import { ENTREPOT_THIES } from "@/lib/coursier-assignment"
 
 export default function UsersPage() {
   const { user: currentAdmin } = useAuth()
@@ -29,7 +30,7 @@ export default function UsersPage() {
   const [password] = useState("EbnExpress2025@") // Mot de passe par défaut
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
-  const [role, setRole] = useState<"user" | "admin" | "chauffeur">("admin")
+  const [role, setRole] = useState<"user" | "admin" | "chauffeur" | "coursier">("admin")
   const [createError, setCreateError] = useState("")
   const [createSuccess, setCreateSuccess] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -173,7 +174,7 @@ export default function UsersPage() {
       // When the user logs in for the first time, the system can update the document with their Firebase Auth UID
       // Or the admin can manually create the Firebase Auth account and update the document
       
-      const userData = {
+      const userData: any = {
         email,
         name,
         phone,
@@ -184,6 +185,15 @@ export default function UsersPage() {
         _needsAuthAccount: true, // Flag to indicate Firebase Auth account needs to be created
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      }
+
+      // Si c'est un coursier, ajouter la localisation de l'entrepôt
+      if (role === "coursier") {
+        userData.location = {
+          latitude: ENTREPOT_THIES.latitude,
+          longitude: ENTREPOT_THIES.longitude,
+          updatedAt: serverTimestamp(),
+        }
       }
 
       // Créer l'utilisateur dans Firebase Auth
@@ -256,7 +266,7 @@ export default function UsersPage() {
       setEmail("")
       setName("")
       setPhone("")
-      setRole("admin")
+      setRole("admin" as "user" | "admin" | "chauffeur" | "coursier")
       setShowCreateForm(false)
       await fetchUsers()
       
@@ -276,6 +286,8 @@ export default function UsersPage() {
         return <Shield className="h-4 w-4 text-blue-500" />
       case "chauffeur":
         return <UserCheck className="h-4 w-4 text-green-500" />
+      case "coursier":
+        return <Truck className="h-4 w-4 text-purple-500" />
       default:
         return <User className="h-4 w-4 text-gray-500" />
     }
@@ -287,6 +299,8 @@ export default function UsersPage() {
         return "Administrateur"
       case "chauffeur":
         return "Chauffeur"
+      case "coursier":
+        return "Coursier"
       default:
         return "Utilisateur"
     }
@@ -389,13 +403,14 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Rôle</Label>
-                  <Select value={role} onValueChange={(value: "user" | "admin" | "chauffeur") => setRole(value)}>
+                  <Select value={role} onValueChange={(value: "user" | "admin" | "chauffeur" | "coursier") => setRole(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Administrateur</SelectItem>
                       <SelectItem value="chauffeur">Chauffeur</SelectItem>
+                      <SelectItem value="coursier">Coursier</SelectItem>
                       <SelectItem value="user">Utilisateur</SelectItem>
                     </SelectContent>
                   </Select>
