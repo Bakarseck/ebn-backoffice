@@ -77,13 +77,13 @@ export async function getAvailableCoursiers(): Promise<AppUser[]> {
 
 /**
  * Trouve le coursier le plus proche d'un point GPS donné
- * Si c'est le premier colis, assigne au premier coursier disponible
- * Sinon, trouve le coursier le plus proche du dernier colis porte à porte assigné
+ * Si c'est le premier colis porte à porte, assigne au premier coursier disponible
+ * Sinon, trouve le coursier le plus proche du nouveau colis (pas du dernier colis)
  */
 export async function findBestCoursier(
   shipmentLat: number,
   shipmentLon: number,
-  previousShipmentId?: string
+  isFirstShipment: boolean = false
 ): Promise<AppUser | null> {
   const coursiers = await getAvailableCoursiers()
 
@@ -91,62 +91,34 @@ export async function findBestCoursier(
     return null
   }
 
-  // Si c'est le premier colis ou pas de colis précédent, assigner au premier coursier
-  if (!previousShipmentId) {
+  // Si c'est le premier colis porte à porte, assigner au premier coursier
+  if (isFirstShipment) {
     return coursiers[0]
   }
 
-  // Récupérer le dernier colis assigné pour trouver sa position
-  try {
-    const previousShipmentRef = doc(db, "shipments", previousShipmentId)
-    const previousShipmentDoc = await getDoc(previousShipmentRef)
+  // Pour les colis suivants, trouver le coursier le plus proche du NOUVEAU colis
+  // On compare la distance entre la position du coursier et la position du nouveau colis
+  let bestCoursier: AppUser | null = null
+  let minDistance = Infinity
 
-    if (!previousShipmentDoc.exists()) {
-      // Si le colis précédent n'existe pas, assigner au premier coursier
-      return coursiers[0]
+  for (const coursier of coursiers) {
+    if (!coursier.location) continue
+
+    // Calculer la distance entre le nouveau colis et la position actuelle du coursier
+    const distance = calculateDistance(
+      shipmentLat,
+      shipmentLon,
+      coursier.location.latitude,
+      coursier.location.longitude
+    )
+
+    if (distance < minDistance) {
+      minDistance = distance
+      bestCoursier = coursier
     }
-
-    const previousShipmentData = previousShipmentDoc.data() as Shipment
-    // Pour le dernier colis, utiliser les coordonnées du destinataire (point de livraison)
-    // ou les coordonnées du colis lui-même
-    const previousLat =
-      previousShipmentData.lat ||
-      previousShipmentData.sender?.location?.latitude
-    const previousLon =
-      previousShipmentData.lon ||
-      previousShipmentData.sender?.location?.longitude
-
-    if (!previousLat || !previousLon) {
-      // Si pas de coordonnées pour le colis précédent, assigner au premier coursier
-      return coursiers[0]
-    }
-
-    // Trouver le coursier le plus proche du dernier colis assigné
-    // On compare la distance entre la position du coursier et la position du dernier colis
-    let bestCoursier: AppUser | null = null
-    let minDistance = Infinity
-
-    for (const coursier of coursiers) {
-      if (!coursier.location) continue
-
-      const distance = calculateDistance(
-        previousLat,
-        previousLon,
-        coursier.location.latitude,
-        coursier.location.longitude
-      )
-
-      if (distance < minDistance) {
-        minDistance = distance
-        bestCoursier = coursier
-      }
-    }
-
-    return bestCoursier || coursiers[0]
-  } catch (error) {
-    console.error("Error finding best coursier:", error)
-    return coursiers[0] // Fallback au premier coursier
   }
+
+  return bestCoursier || coursiers[0]
 }
 
 /**
@@ -215,14 +187,15 @@ export async function assignCoursierToShipment(
       return { success: false }
     }
 
-    // Trouver le dernier colis porte à porte assigné
+    // Vérifier si c'est le premier colis porte à porte
     const lastShipment = await findLastAssignedPorteAPorteShipment()
+    const isFirstShipment = !lastShipment
 
-    // Trouver le meilleur coursier
+    // Trouver le meilleur coursier (le plus proche du nouveau colis)
     const bestCoursier = await findBestCoursier(
       shipmentLat,
       shipmentLon,
-      lastShipment?.id
+      isFirstShipment
     )
 
     if (!bestCoursier) {
