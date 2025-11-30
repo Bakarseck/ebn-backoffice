@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,6 +34,7 @@ export default function UsersPage() {
   const [createSuccess, setCreateSuccess] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState("")
+  const [generatingEmail, setGeneratingEmail] = useState(false)
 
   const fetchUsers = async () => {
     try {
@@ -81,6 +82,70 @@ export default function UsersPage() {
     )
     setFilteredUsers(filtered)
   }, [searchTerm, users])
+
+  // Fonction pour générer l'email à partir du nom
+  const generateEmailFromName = useCallback(async (fullName: string) => {
+    if (!fullName.trim()) {
+      setEmail("")
+      return
+    }
+
+    setGeneratingEmail(true)
+    try {
+      // Nettoyer le nom : enlever les accents, convertir en minuscules, remplacer les espaces par des points
+      const cleanName = fullName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Enlever les accents
+        .trim()
+        .replace(/\s+/g, ".") // Remplacer les espaces multiples par un point
+        .replace(/[^a-z0-9.]/g, "") // Enlever les caractères spéciaux sauf points
+
+      // Générer l'email de base
+      let baseEmail = `${cleanName}@ebn-express.com`
+      let finalEmail = baseEmail
+      let counter = 1
+
+      // Vérifier si l'email existe déjà
+      const usersRef = collection(db, "users")
+      const snapshot = await getDocs(usersRef)
+      
+      // Vérifier aussi dans Firebase Auth (on ne peut pas le faire directement, mais on vérifie dans Firestore)
+      const existingEmails = new Set(
+        snapshot.docs.map((doc) => {
+          const data = doc.data()
+          return (data.email || "").toLowerCase()
+        })
+      )
+
+      // Si l'email existe, incrémenter jusqu'à trouver un email disponible
+      while (existingEmails.has(finalEmail.toLowerCase())) {
+        finalEmail = `${cleanName}${counter}@ebn-express.com`
+        counter++
+      }
+
+      setEmail(finalEmail)
+    } catch (error) {
+      console.error("Error generating email:", error)
+    } finally {
+      setGeneratingEmail(false)
+    }
+  }, [])
+
+  // Générer l'email automatiquement quand le nom change (avec debounce)
+  useEffect(() => {
+    if (!name.trim()) {
+      setEmail("")
+      return
+    }
+
+    // Debounce pour éviter trop de requêtes
+    const timeoutId = setTimeout(() => {
+      generateEmailFromName(name)
+    }, 500) // Attendre 500ms après la dernière frappe
+
+    return () => clearTimeout(timeoutId)
+  }, [name, generateEmailFromName])
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -292,14 +357,25 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@example.com"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="nom.prenom@ebn-express.com"
+                      required
+                      className={generatingEmail ? "opacity-50" : ""}
+                    />
+                    {generatingEmail && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    L'email est généré automatiquement à partir du nom. Vous pouvez le modifier si nécessaire.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Téléphone</Label>
