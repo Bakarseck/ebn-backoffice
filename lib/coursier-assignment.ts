@@ -176,6 +176,11 @@ export async function assignCoursierToShipment(
       return { success: false }
     }
 
+    // Si déjà assigné, ne pas réassigner
+    if (shipment.coursierId) {
+      return { success: true, coursierId: shipment.coursierId, coursierName: shipment.coursierName }
+    }
+
     // Obtenir les coordonnées du colis
     const shipmentLat =
       shipment.lat || shipment.sender?.location?.latitude
@@ -187,9 +192,17 @@ export async function assignCoursierToShipment(
       return { success: false }
     }
 
-    // Vérifier si c'est le premier colis porte à porte
+    // Vérifier si c'est le premier colis porte à porte (aucun colis assigné)
     const lastShipment = await findLastAssignedPorteAPorteShipment()
     const isFirstShipment = !lastShipment
+    
+    console.log("Assignation coursier:", {
+      shipmentId,
+      isFirstShipment,
+      hasLastShipment: !!lastShipment,
+      shipmentLat,
+      shipmentLon,
+    })
 
     // Trouver le meilleur coursier (le plus proche du nouveau colis)
     const bestCoursier = await findBestCoursier(
@@ -219,6 +232,68 @@ export async function assignCoursierToShipment(
   } catch (error) {
     console.error("Error assigning coursier to shipment:", error)
     return { success: false }
+  }
+}
+
+/**
+ * Assignation automatique de tous les colis porte à porte en attente
+ * qui n'ont pas encore de coursier assigné
+ */
+export async function assignPendingPorteAPorteShipments(): Promise<{
+  assigned: number
+  failed: number
+  errors: string[]
+}> {
+  const errors: string[] = []
+  let assigned = 0
+  let failed = 0
+
+  try {
+    const shipmentsRef = collection(db, "shipments")
+    const snapshot = await getDocs(shipmentsRef)
+
+    // Filtrer les colis porte à porte acceptés sans coursier
+    const pendingShipments = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate(),
+      }))
+      .filter(
+        (shipment: any) =>
+          shipment.routeInfo?.deliveryMode === "porte_a_porte" &&
+          shipment.trackingNumber && // Accepté (a un numéro de suivi)
+          !shipment.coursierId // Pas encore assigné
+      ) as Shipment[]
+
+    // Trier par date de création (plus ancien en premier)
+    pendingShipments.sort((a, b) => {
+      const dateA = a.createdAt?.getTime() || 0
+      const dateB = b.createdAt?.getTime() || 0
+      return dateA - dateB
+    })
+
+    // Assigner chaque colis
+    for (const shipment of pendingShipments) {
+      try {
+        const result = await assignCoursierToShipment(shipment.id, shipment)
+        if (result.success) {
+          assigned++
+        } else {
+          failed++
+          errors.push(`Colis ${shipment.trackingNumber || shipment.id}: échec de l'assignation`)
+        }
+      } catch (error: any) {
+        failed++
+        errors.push(`Colis ${shipment.trackingNumber || shipment.id}: ${error.message}`)
+      }
+    }
+
+    return { assigned, failed, errors }
+  } catch (error: any) {
+    console.error("Error assigning pending shipments:", error)
+    return { assigned, failed, errors: [error.message] }
   }
 }
 

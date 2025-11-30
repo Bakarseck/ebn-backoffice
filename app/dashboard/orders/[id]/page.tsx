@@ -93,11 +93,9 @@ export default function OrderDetailPage() {
             coursierId: assignmentResult.coursierId,
             coursierName: assignmentResult.coursierName,
           })
-          toast({
-            title: "Coursier assigné",
-            description: `Le coursier ${assignmentResult.coursierName} a été automatiquement assigné à ce colis.`,
-            variant: "default",
-          })
+          console.log(`✅ Colis ${trackingNumber} assigné à ${assignmentResult.coursierName}`)
+        } else {
+          console.warn(`⚠️ Échec de l'assignation pour le colis ${trackingNumber}`)
         }
       }
     } catch (error) {

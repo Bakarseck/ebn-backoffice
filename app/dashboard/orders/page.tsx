@@ -8,7 +8,7 @@ import { Search, Package, Eye, Check, Trash2, AlertTriangle } from "lucide-react
 import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Shipment } from "@/lib/types"
-import { assignCoursierToShipment } from "@/lib/coursier-assignment"
+import { assignCoursierToShipment, assignPendingPorteAPorteShipments } from "@/lib/coursier-assignment"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -86,8 +86,18 @@ export default function OrdersPage() {
           status: "picked-up",
           updatedAt: new Date(),
         }
-        await assignCoursierToShipment(shipmentId, updatedShipment)
+        const assignmentResult = await assignCoursierToShipment(shipmentId, updatedShipment)
+        if (assignmentResult.success) {
+          console.log(`✅ Colis ${trackingNumber} assigné à ${assignmentResult.coursierName}`)
+        } else {
+          console.warn(`⚠️ Échec de l'assignation pour le colis ${trackingNumber}`)
+        }
       }
+
+      // Assigner automatiquement tous les colis en attente après chaque acceptation
+      assignPendingPorteAPorteShipments().catch((error) => {
+        console.error("Error auto-assigning pending shipments:", error)
+      })
 
       fetchShipments()
     } catch (error) {
@@ -162,6 +172,10 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchShipments()
+    // Assigner automatiquement les colis en attente au chargement
+    assignPendingPorteAPorteShipments().catch((error) => {
+      console.error("Error auto-assigning pending shipments:", error)
+    })
   }, [])
 
   useEffect(() => {

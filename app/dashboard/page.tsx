@@ -8,7 +8,7 @@ import { collection, query, getDocs, orderBy, doc, updateDoc, getDoc } from "fir
 import { db } from "@/lib/firebase"
 import type { Shipment } from "@/lib/types"
 import Link from "next/link"
-import { assignCoursierToShipment } from "@/lib/coursier-assignment"
+import { assignCoursierToShipment, assignPendingPorteAPorteShipments } from "@/lib/coursier-assignment"
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -75,8 +75,16 @@ export default function DashboardPage() {
           status: "picked-up",
           updatedAt: new Date(),
         }
-        await assignCoursierToShipment(shipmentId, updatedShipment)
+        const assignmentResult = await assignCoursierToShipment(shipmentId, updatedShipment)
+        if (assignmentResult.success) {
+          console.log(`✅ Colis ${trackingNumber} assigné à ${assignmentResult.coursierName}`)
+        }
       }
+
+      // Assigner automatiquement tous les colis en attente après chaque acceptation
+      assignPendingPorteAPorteShipments().catch((error) => {
+        console.error("Error auto-assigning pending shipments:", error)
+      })
 
       fetchData()
     } catch (error) {
