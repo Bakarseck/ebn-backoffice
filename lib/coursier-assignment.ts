@@ -154,10 +154,6 @@ export async function findBestCoursier(
   return bestCoursier || coursiers[0]
 }
 
-/**
- * Trouve le dernier colis porte à porte assigné à un coursier
- * pour déterminer la position de référence
- */
 export async function findLastAssignedPorteAPorteShipment(): Promise<
   Shipment | null
 > {
