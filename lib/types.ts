@@ -42,6 +42,11 @@ export interface Shipment {
   chauffeurName?: string // Nom du chauffeur (pour affichage)
   coursierId?: string // ID du coursier assigné à cette expédition (pour porte à porte)
   coursierName?: string // Nom du coursier (pour affichage)
+  // Pré-assignations spécifiques pour les courses porte à porte Dakar ↔ Thiès
+  coursierThiesId?: string
+  coursierThiesName?: string
+  coursierDakarId?: string
+  coursierDakarName?: string
   status: "pending" | "picked-up" | "in-transit" | "out-for-delivery" | "delivered" | "cancelled"
   createdAt: Date
   updatedAt: Date
@@ -59,6 +64,8 @@ export interface AppUser {
   name: string
   phone: string
   role: "user" | "admin" | "chauffeur" | "coursier"
+  // Zone principale pour les coursiers (ex: "dakar", "thies")
+  zone?: string
   fcmToken?: string
   location?: {
     latitude: number

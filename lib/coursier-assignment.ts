@@ -2,7 +2,7 @@
  * Fonctions utilitaires pour l'assignation automatique des coursiers
  */
 
-import { collection, getDocs, query, where, doc, updateDoc, getDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore"
 import { db } from "./firebase"
 import type { AppUser, Shipment } from "./types"
 
@@ -10,6 +10,39 @@ import type { AppUser, Shipment } from "./types"
 export const ENTREPOT_THIES = {
   latitude: 14.7886,
   longitude: -16.9261,
+}
+
+// Coordonnées de base pour Dakar (par défaut pour les coursiers Dakar)
+export const BASE_DAKAR = {
+  // Latitude: 14° 41' 4.79" N → ~14.6847
+  latitude: 14.6847,
+  // Longitude: -17° 27' 6.59" W → ~-17.4518
+  longitude: -17.4518,
+}
+
+// Normalisation simple des noms de ville (minuscules, sans accents)
+function normalizeCity(value: string | undefined | null): string {
+  if (!value) return ""
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+type PorteAPorteDirection = "dakar_to_thies" | "thies_to_dakar" | null
+
+function getPorteAPorteDirection(from?: string, to?: string): PorteAPorteDirection {
+  const fromNorm = normalizeCity(from)
+  const toNorm = normalizeCity(to)
+
+  const isFromDakar = fromNorm.includes("dakar")
+  const isToDakar = toNorm.includes("dakar")
+  const isFromThies = fromNorm.includes("thies")
+  const isToThies = toNorm.includes("thies")
+
+  if (isFromDakar && isToThies) return "dakar_to_thies"
+  if (isFromThies && isToDakar) return "thies_to_dakar"
+  return null
 }
 
 /**
@@ -178,9 +211,49 @@ export async function assignCoursierToShipment(
 
     // Si déjà assigné, ne pas réassigner
     if (shipment.coursierId) {
-      return { success: true, coursierId: shipment.coursierId, coursierName: shipment.coursierName }
+      return {
+        success: true,
+        coursierId: shipment.coursierId,
+        coursierName: shipment.coursierName,
+      }
     }
 
+    // Préférence 1 : utiliser les coursierThiesId / coursierDakarId pour les courses porte à porte Dakar ↔ Thiès
+    const direction = getPorteAPorteDirection(
+      shipment.routeInfo?.from,
+      shipment.routeInfo?.to
+    )
+
+    if (direction === "dakar_to_thies" && shipment.coursierDakarId) {
+      const shipmentRef = doc(db, "shipments", shipmentId)
+      await updateDoc(shipmentRef, {
+        coursierId: shipment.coursierDakarId,
+        coursierName: shipment.coursierDakarName || shipment.coursierName || null,
+        // on laisse aussi les champs coursierDakar* en base pour traçabilité
+        updatedAt: new Date(),
+      })
+      return {
+        success: true,
+        coursierId: shipment.coursierDakarId,
+        coursierName: shipment.coursierDakarName || shipment.coursierName,
+      }
+    }
+
+    if (direction === "thies_to_dakar" && shipment.coursierThiesId) {
+      const shipmentRef = doc(db, "shipments", shipmentId)
+      await updateDoc(shipmentRef, {
+        coursierId: shipment.coursierThiesId,
+        coursierName: shipment.coursierThiesName || shipment.coursierName || null,
+        updatedAt: new Date(),
+      })
+      return {
+        success: true,
+        coursierId: shipment.coursierThiesId,
+        coursierName: shipment.coursierThiesName || shipment.coursierName,
+      }
+    }
+
+    // Préférence 2 : logique existante d'assignation automatique par proximité
     // Obtenir les coordonnées du colis
     const shipmentLat =
       shipment.lat || shipment.sender?.location?.latitude

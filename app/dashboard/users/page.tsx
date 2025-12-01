@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/auth-context"
 import type { AppUser } from "@/lib/types"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
-import { ENTREPOT_THIES } from "@/lib/coursier-assignment"
+import { ENTREPOT_THIES, BASE_DAKAR } from "@/lib/coursier-assignment"
 
 export default function UsersPage() {
   const { user: currentAdmin } = useAuth()
@@ -31,6 +31,7 @@ export default function UsersPage() {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [role, setRole] = useState<"user" | "admin" | "chauffeur" | "coursier">("admin")
+  const [courierZone, setCourierZone] = useState<"thies" | "dakar">("thies")
   const [createError, setCreateError] = useState("")
   const [createSuccess, setCreateSuccess] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -187,12 +188,24 @@ export default function UsersPage() {
         updatedAt: serverTimestamp(),
       }
 
-      // Si c'est un coursier, ajouter la localisation de l'entrepôt
+      // Si c'est un coursier, ajouter la zone et éventuellement la localisation par défaut
       if (role === "coursier") {
-        userData.location = {
-          latitude: ENTREPOT_THIES.latitude,
-          longitude: ENTREPOT_THIES.longitude,
-          updatedAt: serverTimestamp(),
+        userData.zone = courierZone
+
+        if (courierZone === "thies") {
+          // Localisation par défaut : entrepôt de Thiès
+          userData.location = {
+            latitude: ENTREPOT_THIES.latitude,
+            longitude: ENTREPOT_THIES.longitude,
+            updatedAt: serverTimestamp(),
+          }
+        } else if (courierZone === "dakar") {
+          // Pour Dakar, on positionne le coursier sur les coordonnées de base fournies
+          userData.location = {
+            latitude: BASE_DAKAR.latitude,
+            longitude: BASE_DAKAR.longitude,
+            updatedAt: serverTimestamp(),
+          }
         }
       }
 
@@ -415,6 +428,27 @@ export default function UsersPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {role === "coursier" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="zone">Zone du coursier</Label>
+                    <Select
+                      value={courierZone}
+                      onValueChange={(value: "thies" | "dakar") => setCourierZone(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir une zone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="thies">Thiès</SelectItem>
+                        <SelectItem value="dakar">Dakar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Pour Thiès, le coursier sera positionné par défaut à l&apos;entrepôt.  
+                      Pour Dakar, seule une adresse de base sera enregistrée.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="password">Mot de passe</Label>
                   <Input
