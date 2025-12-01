@@ -15,6 +15,20 @@ export default function TrackingPage() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
 
+  const formatCurrentLocation = (value: Shipment["currentLocation"]) => {
+    if (typeof value === "string") return value
+    if (
+      value &&
+      typeof value === "object" &&
+      "latitude" in value &&
+      "longitude" in value
+    ) {
+      const loc = value as { latitude: number | string; longitude: number | string }
+      return `${loc.latitude}, ${loc.longitude}`
+    }
+    return ""
+  }
+
   const handleSearch = async () => {
     if (!trackingNumber.trim()) return
 
@@ -189,7 +203,7 @@ export default function TrackingPage() {
                   <p className="text-sm text-muted-foreground">Position actuelle</p>
                   <p className="font-medium flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    {shipment.currentLocation}
+                    {formatCurrentLocation(shipment.currentLocation)}
                   </p>
                 </div>
               )}

@@ -36,6 +36,20 @@ export default function OrderDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const { toast } = useToast()
 
+  const formatCurrentLocation = (value: Shipment["currentLocation"]) => {
+    if (typeof value === "string") return value
+    if (
+      value &&
+      typeof value === "object" &&
+      "latitude" in value &&
+      "longitude" in value
+    ) {
+      const loc = value as { latitude: number | string; longitude: number | string }
+      return `${loc.latitude}, ${loc.longitude}`
+    }
+    return ""
+  }
+
   const generateTrackingNumber = () => {
     const prefix = "EBN"
     const timestamp = Date.now().toString().slice(-8)
@@ -466,7 +480,7 @@ export default function OrderDetailPage() {
             {shipment.currentLocation && (
               <div>
                 <p className="text-sm text-muted-foreground">Position actuelle</p>
-                <p className="font-medium">{shipment.currentLocation}</p>
+                <p className="font-medium">{formatCurrentLocation(shipment.currentLocation)}</p>
               </div>
             )}
             {shipment.lon != null && shipment.lat != null && (
