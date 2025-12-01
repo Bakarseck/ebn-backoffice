@@ -285,15 +285,25 @@ export default function OrderDetailPage() {
   }
 
   const getStatusLabel = (status: string) => {
+    const statusLower = status.toLowerCase()
     const labels: Record<string, string> = {
+      // Codes internes
       pending: "En attente",
       "picked-up": "Récupéré",
       "in-transit": "En transit",
-      "out-for-delivery": "En livraison",
+      "out-for-delivery": "En attente de livraison finale",
       delivered: "Livré",
       cancelled: "Annulé",
+
+      // Valeurs en français envoyées par le mobile
+      "en attente": "En attente",
+      "en attente de transit": "En attente de transit",
+      "en transit": "En transit",
+      "en attente de livraison finale": "En attente de livraison finale",
+      "annule": "Annulé",
+      "livre": "Livré",
     }
-    return labels[status] || status
+    return labels[statusLower] || labels[status] || status
   }
 
   if (loading) {

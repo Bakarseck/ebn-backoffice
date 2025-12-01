@@ -87,15 +87,25 @@ export default function TrackingPage() {
   const getStatusLabel = (status: string) => {
     const statusLower = status.toLowerCase()
     const labels: Record<string, { text: string; color: string }> = {
+      // Codes internes
       pending: { text: "En attente", color: "bg-gray-500/10 text-gray-500" },
       "picked-up": { text: "Récupéré", color: "bg-blue-500/10 text-blue-500" },
       "in-transit": { text: "En transit", color: "bg-purple-500/10 text-purple-500" },
-      "out-for-delivery": { text: "En livraison", color: "bg-orange-500/10 text-orange-500" },
+      "out-for-delivery": { text: "En attente de livraison finale", color: "bg-orange-500/10 text-orange-500" },
       delivered: { text: "Livré", color: "bg-green-500/10 text-green-500" },
       cancelled: { text: "Annulé", color: "bg-red-500/10 text-red-500" },
-      "en cours": { text: "En cours", color: "bg-purple-500/10 text-purple-500" },
+
+      // Valeurs en français envoyées par le mobile
+      "en attente": { text: "En attente", color: "bg-gray-500/10 text-gray-500" },
+      "en attente de transit": { text: "En attente de transit", color: "bg-purple-500/10 text-purple-500" },
+      "en transit": { text: "En transit", color: "bg-purple-500/10 text-purple-500" },
+      "en attente de livraison finale": {
+        text: "En attente de livraison finale",
+        color: "bg-orange-500/10 text-orange-500",
+      },
+      "annule": { text: "Annulé", color: "bg-red-500/10 text-red-500" },
+      "livre": { text: "Livré", color: "bg-green-500/10 text-green-500" },
     }
-    // Chercher le statut en minuscules ou retourner le label par défaut
     return labels[statusLower] || labels[status] || { text: status, color: "bg-gray-500/10 text-gray-500" }
   }
 
